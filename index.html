@@ -1,0 +1,1246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Path Planner // Dijkstra & A*</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-dark: #111114;
+            --bg-panel: #1a1a1f;
+            --bg-card: #222228;
+            --bg-hover: #2a2a32;
+            --border: #333340;
+            --border-light: #444450;
+            --text: #f0f0f5;
+            --text-mid: #b0b0b8;
+            --text-dim: #707078;
+            --accent: #ff6b35;
+            --accent-glow: rgba(255, 107, 53, 0.2);
+            --accent-hover: #ff8555;
+            --start-color: #10b981;
+            --goal-color: #3b82f6;
+            --neighbor-color: #10b981;
+            --path-color: #ef4444;
+            --visited-color: #52525b;
+            --current-color: #f59e0b;
+            --cell-light: #fafafc;
+        }
+
+        body {
+            font-family: 'DM Sans', -apple-system, sans-serif;
+            background: var(--bg-dark);
+            color: var(--text);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* ===== LAYOUT ===== */
+        .app-layout {
+            display: grid;
+            grid-template-columns: 300px 1fr 300px;
+            min-height: 100vh;
+        }
+
+        /* ===== PANELS ===== */
+        .panel {
+            background: var(--bg-panel);
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+        }
+
+        .panel-left {
+            border-right: 1px solid var(--border);
+        }
+
+        .panel-right {
+            border-left: 1px solid var(--border);
+        }
+
+        .panel-header {
+            padding: 1.25rem;
+            border-bottom: 1px solid var(--border);
+            background: linear-gradient(180deg, var(--bg-card) 0%, var(--bg-panel) 100%);
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .logo-icon {
+            width: 36px;
+            height: 36px;
+            background: var(--accent);
+            border-radius: 9px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: white;
+            box-shadow: 0 4px 12px var(--accent-glow);
+        }
+
+        .logo-text {
+            font-weight: 700;
+            font-size: 1.1rem;
+            letter-spacing: -0.5px;
+        }
+
+        .logo-text span {
+            color: var(--text-dim);
+            font-weight: 400;
+        }
+
+        .panel-title {
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-dim);
+        }
+
+        /* Panel Content */
+        .panel-content {
+            padding: 1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.875rem;
+        }
+
+        /* Cards */
+        .card {
+            background: var(--bg-card);
+            border-radius: 12px;
+            padding: 1rem;
+            border: 1px solid var(--border);
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 0.875rem;
+        }
+
+        .card-icon {
+            width: 24px;
+            height: 24px;
+            background: var(--accent);
+            color: white;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.7rem;
+            font-weight: 700;
+        }
+
+        .card-title {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--text);
+        }
+
+        /* Algorithm Selector */
+        .algo-selector {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px;
+            background: var(--bg-dark);
+            padding: 5px;
+            border-radius: 10px;
+        }
+
+        .algo-btn {
+            font-family: inherit;
+            font-size: 0.9rem;
+            font-weight: 600;
+            padding: 0.75rem 0.75rem;
+            border: 2px solid transparent;
+            background: transparent;
+            color: var(--text-dim);
+            cursor: pointer;
+            border-radius: 7px;
+            transition: all 0.2s;
+        }
+
+        .algo-btn:hover {
+            color: var(--text);
+            background: var(--bg-hover);
+        }
+
+        .algo-btn.active {
+            background: var(--accent);
+            color: white;
+            box-shadow: 0 4px 12px var(--accent-glow);
+        }
+
+        /* Mode Grid */
+        .mode-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+
+        .mode-btn {
+            font-family: inherit;
+            font-size: 0.8rem;
+            font-weight: 500;
+            padding: 0.75rem 0.5rem;
+            border: 2px solid var(--border);
+            background: var(--bg-panel);
+            color: var(--text-mid);
+            cursor: pointer;
+            border-radius: 8px;
+            transition: all 0.15s;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .mode-btn .icon {
+            font-size: 1.25rem;
+            line-height: 1;
+        }
+
+        .mode-btn:hover {
+            border-color: var(--border-light);
+            background: var(--bg-hover);
+            color: var(--text);
+        }
+
+        .mode-btn.active {
+            border-color: var(--accent);
+            background: var(--accent-glow);
+            color: var(--accent);
+        }
+
+        /* Heuristic Options */
+        .heuristic-card {
+            display: none;
+        }
+
+        .heuristic-card.visible {
+            display: block;
+        }
+
+        .heuristic-list {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .heuristic-btn {
+            font-family: inherit;
+            font-size: 0.85rem;
+            font-weight: 500;
+            padding: 0.7rem 0.875rem;
+            border: 2px solid var(--border);
+            background: var(--bg-panel);
+            color: var(--text-mid);
+            cursor: pointer;
+            border-radius: 8px;
+            transition: all 0.15s;
+            text-align: left;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .heuristic-btn:hover {
+            border-color: var(--border-light);
+            background: var(--bg-hover);
+            color: var(--text);
+        }
+
+        .heuristic-btn.active {
+            border-color: var(--accent);
+            background: var(--accent-glow);
+            color: var(--accent);
+        }
+
+        .heuristic-btn .formula {
+            font-family: 'DM Mono', monospace;
+            font-size: 0.65rem;
+            color: var(--text-dim);
+            background: var(--bg-dark);
+            padding: 3px 6px;
+            border-radius: 4px;
+        }
+
+        .heuristic-btn.active .formula {
+            background: rgba(255,107,53,0.15);
+            color: var(--accent);
+        }
+
+        /* Movement Settings */
+        .setting-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.6rem 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .setting-row:last-child {
+            border-bottom: none;
+            padding-bottom: 0;
+        }
+
+        .setting-row:first-child {
+            padding-top: 0;
+        }
+
+        .setting-label {
+            font-size: 0.85rem;
+            color: var(--text);
+        }
+
+        .setting-value {
+            font-family: 'DM Mono', monospace;
+            font-size: 0.85rem;
+            color: var(--accent);
+            font-weight: 500;
+        }
+
+        /* Toggle */
+        .toggle {
+            position: relative;
+            width: 44px;
+            height: 26px;
+        }
+
+        .toggle input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .toggle-track {
+            position: absolute;
+            cursor: pointer;
+            inset: 0;
+            background: var(--bg-dark);
+            border: 2px solid var(--border);
+            border-radius: 26px;
+            transition: 0.2s;
+        }
+
+        .toggle-track:before {
+            position: absolute;
+            content: "";
+            height: 16px;
+            width: 16px;
+            left: 3px;
+            bottom: 3px;
+            background: var(--text-dim);
+            border-radius: 50%;
+            transition: 0.2s;
+        }
+
+        .toggle input:checked + .toggle-track {
+            background: var(--accent);
+            border-color: var(--accent);
+        }
+
+        .toggle input:checked + .toggle-track:before {
+            transform: translateX(18px);
+            background: white;
+        }
+
+        /* Action Buttons */
+        .action-stack {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .action-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+
+        .action-btn {
+            font-family: inherit;
+            font-size: 0.85rem;
+            font-weight: 600;
+            padding: 0.8rem 0.75rem;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.15s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+
+        .action-btn.primary {
+            background: var(--accent);
+            color: white;
+            padding: 1rem;
+            font-size: 0.95rem;
+            box-shadow: 0 4px 16px var(--accent-glow);
+        }
+
+        .action-btn.primary:hover {
+            background: var(--accent-hover);
+            transform: translateY(-1px);
+        }
+
+        .action-btn.secondary {
+            background: var(--bg-panel);
+            color: var(--text);
+            border: 2px solid var(--border);
+        }
+
+        .action-btn.secondary:hover {
+            border-color: var(--border-light);
+            background: var(--bg-hover);
+        }
+
+        /* Stats */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+        }
+
+        .stat-box {
+            background: var(--bg-panel);
+            padding: 0.75rem 0.5rem;
+            border-radius: 8px;
+            text-align: center;
+            border: 1px solid var(--border);
+        }
+
+        .stat-value {
+            font-family: 'DM Mono', monospace;
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: var(--accent);
+        }
+
+        .stat-label {
+            font-size: 0.65rem;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-top: 2px;
+        }
+
+        /* Legend */
+        .legend-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.75rem;
+            color: var(--text-mid);
+        }
+
+        .legend-dot {
+            width: 16px;
+            height: 16px;
+            border-radius: 4px;
+            flex-shrink: 0;
+        }
+
+        .legend-dot.start { background: var(--start-color); }
+        .legend-dot.goal { background: var(--goal-color); }
+        .legend-dot.neighbor { background: var(--neighbor-color); }
+        .legend-dot.path { background: var(--path-color); }
+        .legend-dot.visited { background: var(--visited-color); }
+        .legend-dot.current { background: var(--current-color); }
+        .legend-dot.obstacle { background: #1a1a1d; border: 2px solid var(--border); }
+
+        /* Open List */
+        .open-list {
+            max-height: 140px;
+            overflow-y: auto;
+            font-size: 0.75rem;
+        }
+
+        .open-list::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        .open-list::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 2px;
+        }
+
+        .open-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.4rem 0.6rem;
+            background: var(--bg-panel);
+            border-radius: 6px;
+            margin-bottom: 4px;
+            border: 1px solid var(--border);
+        }
+
+        .open-item.best {
+            background: var(--accent-glow);
+            border-color: var(--accent);
+        }
+
+        .open-item .pos {
+            font-family: 'DM Mono', monospace;
+            color: var(--text);
+        }
+
+        .open-item .cost {
+            font-family: 'DM Mono', monospace;
+            color: var(--accent);
+        }
+
+        /* ===== GRID AREA ===== */
+        .grid-area {
+            padding: 1.25rem;
+            display: flex;
+            flex-direction: column;
+            background: var(--bg-dark);
+        }
+
+        .grid-toolbar {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .grid-size {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            font-size: 0.8rem;
+            color: var(--text-mid);
+            background: var(--bg-panel);
+            padding: 0.4rem 0.6rem;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+        }
+
+        .grid-size input {
+            width: 40px;
+            padding: 0.35rem;
+            font-family: 'DM Mono', monospace;
+            font-size: 0.8rem;
+            background: var(--bg-dark);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            color: var(--text);
+            text-align: center;
+        }
+
+        .grid-size input:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        .grid-size-btn {
+            font-family: inherit;
+            font-size: 0.75rem;
+            font-weight: 500;
+            padding: 0.35rem 0.5rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            color: var(--text);
+            cursor: pointer;
+        }
+
+        .grid-size-btn:hover {
+            border-color: var(--accent);
+        }
+
+        .message-bar {
+            flex: 1;
+            padding: 0.65rem 0.875rem;
+            background: var(--bg-panel);
+            border-radius: 8px;
+            font-size: 0.85rem;
+            color: var(--text-mid);
+            border-left: 4px solid var(--accent);
+        }
+
+        .message-bar.success {
+            border-color: var(--start-color);
+            color: var(--start-color);
+            background: rgba(16, 185, 129, 0.1);
+        }
+
+        /* Grid */
+        .grid-wrapper {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: auto;
+        }
+
+        .grid {
+            display: grid;
+            gap: 3px;
+            background: var(--border);
+            padding: 3px;
+            border-radius: 10px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+        }
+
+        .cell {
+            width: 56px;
+            height: 56px;
+            background: var(--cell-light);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            cursor: pointer;
+            transition: all 0.1s;
+            border-radius: 3px;
+        }
+
+        .cell:hover {
+            transform: scale(1.05);
+            z-index: 10;
+            box-shadow: 0 0 0 3px var(--accent);
+        }
+
+        .cell.obstacle {
+            background: var(--bg-card);
+            cursor: not-allowed;
+        }
+
+        .cell.obstacle:hover {
+            transform: none;
+            box-shadow: none;
+        }
+
+        .cell.start { background: var(--start-color); }
+        .cell.goal { background: var(--goal-color); }
+        .cell.neighbor {
+            background: var(--neighbor-color);
+            animation: pulse 1s ease-in-out infinite;
+        }
+        .cell.path { background: var(--path-color); }
+        .cell.visited { background: var(--visited-color); }
+        .cell.current {
+            background: var(--current-color);
+            animation: none;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        .cell-label {
+            font-family: 'DM Sans', sans-serif;
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: white;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        /* Cell costs for A* */
+        .cell-costs {
+            position: absolute;
+            inset: 0;
+            display: grid;
+            grid-template-rows: auto 1fr auto;
+            padding: 3px;
+            pointer-events: none;
+        }
+
+        .cost-top {
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .cost-g, .cost-h {
+            font-family: 'DM Mono', monospace;
+            font-size: 0.55rem;
+            font-weight: 500;
+            color: #444;
+        }
+
+        .cost-center {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .cost-f {
+            font-family: 'DM Mono', monospace;
+            font-size: 1rem;
+            font-weight: 700;
+            color: #222;
+        }
+
+        .cell-cost-single {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            pointer-events: none;
+        }
+
+        .cost-d {
+            font-family: 'DM Mono', monospace;
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: #222;
+        }
+
+        .cell.neighbor .cost-g, .cell.neighbor .cost-h, .cell.neighbor .cost-f, .cell.neighbor .cost-d,
+        .cell.path .cost-g, .cell.path .cost-h, .cell.path .cost-f, .cell.path .cost-d,
+        .cell.current .cost-g, .cell.current .cost-h, .cell.current .cost-f, .cell.current .cost-d {
+            color: #222;
+        }
+
+        .cell.visited .cost-g, .cell.visited .cost-h, .cell.visited .cost-f, .cell.visited .cost-d {
+            color: #ccc;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-layout">
+        <!-- LEFT PANEL: Setup -->
+        <div class="panel panel-left">
+            <div class="panel-header">
+                <div class="logo">
+                    <div class="logo-icon">◇</div>
+                    <div class="logo-text">PathPlanner</div>
+                </div>
+            </div>
+
+            <div class="panel-content">
+                <!-- Algorithm -->
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon">1</div>
+                        <div class="card-title">Algorithm</div>
+                    </div>
+                    <div class="algo-selector">
+                        <button class="algo-btn active" id="tab-dijkstra" onclick="setAlgorithm('dijkstra')">Dijkstra</button>
+                        <button class="algo-btn" id="tab-astar" onclick="setAlgorithm('astar')">A*</button>
+                    </div>
+                </div>
+
+                <!-- Heuristic (A* only) -->
+                <div class="card heuristic-card" id="heuristic-card">
+                    <div class="card-header">
+                        <div class="card-icon">★</div>
+                        <div class="card-title">Heuristic</div>
+                    </div>
+                    <div class="heuristic-list">
+                        <button class="heuristic-btn active" id="h-manhattan" onclick="setHeuristic('manhattan')">
+                            <span>Manhattan</span>
+                            <span class="formula">|Δx|+|Δy|</span>
+                        </button>
+                        <button class="heuristic-btn" id="h-diagonal" onclick="setHeuristic('diagonal')">
+                            <span>Diagonal</span>
+                            <span class="formula">max(Δx,Δy)</span>
+                        </button>
+                        <button class="heuristic-btn" id="h-euclidean" onclick="setHeuristic('euclidean')">
+                            <span>Euclidean</span>
+                            <span class="formula">√(Δx²+Δy²)</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Edit Mode -->
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon">2</div>
+                        <div class="card-title">Edit Grid</div>
+                    </div>
+                    <div class="mode-grid">
+                        <button class="mode-btn active" id="mode-path" onclick="setMode('path')">
+                            <span class="icon">🎯</span>
+                            Navigate
+                        </button>
+                        <button class="mode-btn" id="mode-obstacle" onclick="setMode('obstacle')">
+                            <span class="icon">◼</span>
+                            Obstacle
+                        </button>
+                        <button class="mode-btn" id="mode-start" onclick="setMode('start')">
+                            <span class="icon" style="color: var(--start-color);">A</span>
+                            Start
+                        </button>
+                        <button class="mode-btn" id="mode-goal" onclick="setMode('goal')">
+                            <span class="icon" style="color: var(--goal-color);">B</span>
+                            Goal
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Movement -->
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon">⚙</div>
+                        <div class="card-title">Movement</div>
+                    </div>
+                    <div class="setting-row">
+                        <span class="setting-label">Diagonal</span>
+                        <label class="toggle">
+                            <input type="checkbox" id="diagonal-toggle" checked onchange="toggleDiagonal()">
+                            <span class="toggle-track"></span>
+                        </label>
+                    </div>
+                    <div class="setting-row">
+                        <span class="setting-label">Sideways</span>
+                        <span class="setting-value">10</span>
+                    </div>
+                    <div class="setting-row">
+                        <span class="setting-label">Diagonal</span>
+                        <span class="setting-value">14</span>
+                    </div>
+                </div>
+
+                <!-- Legend -->
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon">🎨</div>
+                        <div class="card-title">Colors</div>
+                    </div>
+                    <div class="legend-grid">
+                        <div class="legend-item"><div class="legend-dot start"></div>Start (A)</div>
+                        <div class="legend-item"><div class="legend-dot goal"></div>Goal (B)</div>
+                        <div class="legend-item"><div class="legend-dot neighbor"></div>Explorable</div>
+                        <div class="legend-item"><div class="legend-dot path"></div>Your Path</div>
+                        <div class="legend-item"><div class="legend-dot current"></div>Current</div>
+                        <div class="legend-item"><div class="legend-dot visited"></div>Visited</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- CENTER: Grid -->
+        <div class="grid-area">
+            <div class="grid-toolbar">
+                <div class="grid-size">
+                    <span>Size:</span>
+                    <input type="number" id="rows-input" value="7" min="3" max="15">
+                    <span>×</span>
+                    <input type="number" id="cols-input" value="10" min="3" max="20">
+                    <button class="grid-size-btn" onclick="resizeGrid()">Apply</button>
+                </div>
+                <div class="message-bar" id="message">
+                    Click <strong>Start</strong> → then click <strong>green cells</strong> to explore. Your choices form the red path!
+                </div>
+            </div>
+
+            <div class="grid-wrapper">
+                <div class="grid" id="grid"></div>
+            </div>
+        </div>
+
+        <!-- RIGHT PANEL: Controls & Info -->
+        <div class="panel panel-right">
+            <div class="panel-header">
+                <div class="panel-title">Controls & Stats</div>
+            </div>
+
+            <div class="panel-content">
+                <!-- Run Controls -->
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon">▶</div>
+                        <div class="card-title">Run</div>
+                    </div>
+                    <div class="action-stack">
+                        <button class="action-btn primary" onclick="startAlgorithm()">▶ Start Algorithm</button>
+                        <button class="action-btn secondary" onclick="autoSolve()">⚡ Auto-Solve</button>
+                        <div class="action-row">
+                            <button class="action-btn secondary" onclick="undoStep()">↩ Undo</button>
+                            <button class="action-btn secondary" onclick="resetAlgorithm()">↺ Reset</button>
+                        </div>
+                        <button class="action-btn secondary" onclick="clearGrid()">Clear Grid</button>
+                    </div>
+                </div>
+
+                <!-- Stats -->
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon">📊</div>
+                        <div class="card-title">Statistics</div>
+                    </div>
+                    <div class="stats-grid">
+                        <div class="stat-box">
+                            <div class="stat-value" id="stat-steps">0</div>
+                            <div class="stat-label">Steps</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-value" id="stat-visited">0</div>
+                            <div class="stat-label">Visited</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-value" id="stat-cost">–</div>
+                            <div class="stat-label">Path Cost</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-value" id="stat-open">0</div>
+                            <div class="stat-label">Open List</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Open List -->
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon">📋</div>
+                        <div class="card-title">Open List</div>
+                    </div>
+                    <div class="open-list" id="open-list">
+                        <div style="color: var(--text-dim); padding: 0.5rem;">Click Start to begin</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const COST_ORTHOGONAL = 10;
+        const COST_DIAGONAL = 14;
+
+        let grid = [];
+        let rows = 7;
+        let cols = 10;
+        let start = { row: 5, col: 2 };
+        let goal = { row: 1, col: 7 };
+        let algorithm = 'dijkstra';
+        let heuristicType = 'manhattan';
+        let allowDiagonal = true;
+        let mode = 'path';
+        let isRunning = false;
+        let openList = [];
+        let current = null;
+        let pathHistory = [];
+        let steps = 0;
+
+        function initGrid() {
+            grid = [];
+            for (let r = 0; r < rows; r++) {
+                grid[r] = [];
+                for (let c = 0; c < cols; c++) {
+                    grid[r][c] = {
+                        row: r, col: c,
+                        isObstacle: false,
+                        g: Infinity, h: 0, f: Infinity,
+                        parent: null,
+                        isOpen: false, isClosed: false, isPath: false
+                    };
+                }
+            }
+            const obstacles = [[2, 4], [2, 5], [3, 5], [4, 4], [4, 5]];
+            obstacles.forEach(([r, c]) => {
+                if (r < rows && c < cols) grid[r][c].isObstacle = true;
+            });
+        }
+
+        function heuristic(cell) {
+            const dx = Math.abs(cell.col - goal.col);
+            const dy = Math.abs(cell.row - goal.row);
+            switch (heuristicType) {
+                case 'manhattan': return (dx + dy) * COST_ORTHOGONAL;
+                case 'diagonal': return Math.max(dx, dy) * COST_ORTHOGONAL;
+                case 'euclidean': return Math.round(Math.sqrt(dx * dx + dy * dy) * COST_ORTHOGONAL);
+                default: return (dx + dy) * COST_ORTHOGONAL;
+            }
+        }
+
+        function getNeighbors(cell) {
+            const neighbors = [];
+            const orthoDirs = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+            const diagDirs = [[-1, -1], [-1, 1], [1, -1], [1, 1]];
+            const dirs = allowDiagonal ? [...orthoDirs, ...diagDirs] : orthoDirs;
+            
+            for (const [dr, dc] of dirs) {
+                const nr = cell.row + dr;
+                const nc = cell.col + dc;
+                if (nr >= 0 && nr < rows && nc >= 0 && nc < cols) {
+                    const neighbor = grid[nr][nc];
+                    if (!neighbor.isObstacle && !neighbor.isClosed) {
+                        if (dr !== 0 && dc !== 0) {
+                            const adj1 = grid[cell.row + dr]?.[cell.col];
+                            const adj2 = grid[cell.row]?.[cell.col + dc];
+                            if (adj1?.isObstacle || adj2?.isObstacle) continue;
+                        }
+                        neighbors.push({ cell: neighbor, cost: (dr !== 0 && dc !== 0) ? COST_DIAGONAL : COST_ORTHOGONAL });
+                    }
+                }
+            }
+            return neighbors;
+        }
+
+        function renderGrid() {
+            const gridEl = document.getElementById('grid');
+            gridEl.style.gridTemplateColumns = `repeat(${cols}, 56px)`;
+            gridEl.innerHTML = '';
+            
+            for (let r = 0; r < rows; r++) {
+                for (let c = 0; c < cols; c++) {
+                    const cell = grid[r][c];
+                    const el = document.createElement('div');
+                    el.className = 'cell';
+                    
+                    if (cell.isObstacle) el.classList.add('obstacle');
+                    else if (r === start.row && c === start.col) el.classList.add('start');
+                    else if (r === goal.row && c === goal.col) el.classList.add('goal');
+                    else if (current && current.row === r && current.col === c) el.classList.add('current');
+                    else if (cell.isPath) el.classList.add('path');
+                    else if (cell.isOpen) el.classList.add('neighbor');
+                    else if (cell.isClosed) el.classList.add('visited');
+                    
+                    if (r === start.row && c === start.col) {
+                        el.innerHTML = '<span class="cell-label">A</span>';
+                    } else if (r === goal.row && c === goal.col) {
+                        el.innerHTML = '<span class="cell-label">B</span>';
+                    } else if (cell.g !== Infinity && (cell.isOpen || cell.isClosed || cell.isPath)) {
+                        if (algorithm === 'astar') {
+                            el.innerHTML = `<div class="cell-costs">
+                                <div class="cost-top"><span class="cost-g">${cell.g}</span><span class="cost-h">${cell.h}</span></div>
+                                <div class="cost-center"><span class="cost-f">${cell.f}</span></div>
+                                <div></div>
+                            </div>`;
+                        } else {
+                            el.innerHTML = `<div class="cell-cost-single"><span class="cost-d">${cell.g}</span></div>`;
+                        }
+                    }
+                    
+                    el.onclick = () => handleClick(r, c);
+                    gridEl.appendChild(el);
+                }
+            }
+            updateStats();
+            updateOpenList();
+        }
+
+        function handleClick(r, c) {
+            const cell = grid[r][c];
+            if (mode === 'start' && !cell.isObstacle && !(r === goal.row && c === goal.col)) {
+                start = { row: r, col: c }; msg('Start set');
+            } else if (mode === 'goal' && !cell.isObstacle && !(r === start.row && c === start.col)) {
+                goal = { row: r, col: c }; msg('Goal set');
+            } else if (mode === 'obstacle' && !(r === start.row && c === start.col) && !(r === goal.row && c === goal.col)) {
+                cell.isObstacle = !cell.isObstacle;
+            } else if (mode === 'path' && isRunning && cell.isOpen) {
+                expandCell(cell);
+            }
+            renderGrid();
+        }
+
+        function startAlgorithm() {
+            if (isRunning) return;
+            resetAlgorithm();
+            isRunning = true;
+            setMode('path'); // Auto-switch to navigate mode
+            const startCell = grid[start.row][start.col];
+            startCell.g = 0;
+            startCell.h = algorithm === 'astar' ? heuristic(startCell) : 0;
+            startCell.f = startCell.g + startCell.h;
+            startCell.isOpen = true;
+            openList = [startCell];
+            msg('Click a GREEN cell to explore it');
+            renderGrid();
+        }
+
+        function expandCell(cell) {
+            if (!isRunning) return;
+            pathHistory.push(JSON.stringify({
+                grid: grid.map(row => row.map(c => ({...c}))),
+                openList: openList.map(c => ({row: c.row, col: c.col})),
+                current: current ? {row: current.row, col: current.col} : null,
+                steps
+            }));
+            
+            openList = openList.filter(c => c.row !== cell.row || c.col !== cell.col);
+            cell.isOpen = false;
+            cell.isClosed = true;
+            cell.isPath = true;
+            if (current) current.isPath = true;
+            current = cell;
+            steps++;
+            
+            if (cell.row === goal.row && cell.col === goal.col) {
+                isRunning = false;
+                msg('🎉 Goal reached! Cost: ' + cell.g, 'success');
+                renderGrid();
+                return;
+            }
+            
+            const neighbors = getNeighbors(cell);
+            for (const { cell: neighbor, cost } of neighbors) {
+                const tentativeG = cell.g + cost;
+                if (tentativeG < neighbor.g) {
+                    neighbor.g = tentativeG;
+                    neighbor.h = algorithm === 'astar' ? heuristic(neighbor) : 0;
+                    neighbor.f = neighbor.g + neighbor.h;
+                    neighbor.parent = cell;
+                    if (!neighbor.isOpen) {
+                        neighbor.isOpen = true;
+                        openList.push(neighbor);
+                    }
+                }
+            }
+            
+            if (openList.length === 0) {
+                isRunning = false;
+                msg('No path found!');
+            }
+            renderGrid();
+        }
+
+        function autoSolve() {
+            if (!isRunning) startAlgorithm();
+            const solve = () => {
+                if (!isRunning || openList.length === 0) return;
+                openList.sort((a, b) => algorithm === 'astar' ? (a.f - b.f || a.h - b.h) : a.g - b.g);
+                expandCell(openList[0]);
+                if (isRunning) setTimeout(solve, 150);
+            };
+            solve();
+        }
+
+        function undoStep() {
+            if (!pathHistory.length) return msg('Nothing to undo');
+            const state = JSON.parse(pathHistory.pop());
+            for (let r = 0; r < rows; r++) {
+                for (let c = 0; c < cols; c++) {
+                    Object.assign(grid[r][c], state.grid[r][c]);
+                }
+            }
+            openList = state.openList.map(pos => grid[pos.row][pos.col]);
+            current = state.current ? grid[state.current.row][state.current.col] : null;
+            steps = state.steps;
+            isRunning = openList.length > 0;
+            msg('Undone');
+            renderGrid();
+        }
+
+        function resetAlgorithm() {
+            isRunning = false;
+            openList = [];
+            current = null;
+            pathHistory = [];
+            steps = 0;
+            for (let r = 0; r < rows; r++) {
+                for (let c = 0; c < cols; c++) {
+                    const cell = grid[r][c];
+                    cell.g = Infinity; cell.h = 0; cell.f = Infinity;
+                    cell.parent = null;
+                    cell.isOpen = false; cell.isClosed = false; cell.isPath = false;
+                }
+            }
+            msg('Reset — click Start');
+            renderGrid();
+        }
+
+        function clearGrid() {
+            initGrid();
+            resetAlgorithm();
+        }
+
+        function setAlgorithm(algo) {
+            algorithm = algo;
+            document.getElementById('tab-dijkstra').classList.toggle('active', algo === 'dijkstra');
+            document.getElementById('tab-astar').classList.toggle('active', algo === 'astar');
+            document.getElementById('heuristic-card').classList.toggle('visible', algo === 'astar');
+            if (isRunning) resetAlgorithm();
+            msg(algo === 'dijkstra' ? "Dijkstra's algorithm" : "A* with " + heuristicType);
+            renderGrid();
+        }
+
+        function setHeuristic(type) {
+            heuristicType = type;
+            document.querySelectorAll('.heuristic-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById('h-' + type).classList.add('active');
+            if (isRunning) resetAlgorithm();
+            msg('Heuristic: ' + type);
+            renderGrid();
+        }
+
+        function setMode(m) {
+            mode = m;
+            document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById('mode-' + m).classList.add('active');
+        }
+
+        function toggleDiagonal() {
+            allowDiagonal = document.getElementById('diagonal-toggle').checked;
+            if (isRunning) resetAlgorithm();
+            renderGrid();
+        }
+
+        function resizeGrid() {
+            rows = Math.max(3, Math.min(15, parseInt(document.getElementById('rows-input').value) || 7));
+            cols = Math.max(3, Math.min(20, parseInt(document.getElementById('cols-input').value) || 10));
+            start.row = Math.min(start.row, rows - 1);
+            start.col = Math.min(start.col, cols - 1);
+            goal.row = Math.min(goal.row, rows - 1);
+            goal.col = Math.min(goal.col, cols - 1);
+            initGrid();
+            resetAlgorithm();
+        }
+
+        function updateStats() {
+            document.getElementById('stat-steps').textContent = steps;
+            document.getElementById('stat-visited').textContent = grid.flat().filter(c => c.isClosed).length;
+            document.getElementById('stat-open').textContent = openList.length;
+            const goalCell = grid[goal.row][goal.col];
+            document.getElementById('stat-cost').textContent = goalCell.g !== Infinity ? goalCell.g : '–';
+        }
+
+        function updateOpenList() {
+            const el = document.getElementById('open-list');
+            if (!openList.length) {
+                el.innerHTML = '<div style="color: var(--text-dim); padding: 0.5rem;">Click Start to begin</div>';
+                return;
+            }
+            const sorted = [...openList].sort((a, b) => algorithm === 'astar' ? a.f - b.f : a.g - b.g);
+            el.innerHTML = sorted.slice(0, 10).map((c, i) => {
+                const cost = algorithm === 'astar' ? `f=${c.f}` : `d=${c.g}`;
+                return `<div class="open-item${i === 0 ? ' best' : ''}">
+                    <span class="pos">(${c.row}, ${c.col})</span>
+                    <span class="cost">${cost}</span>
+                </div>`;
+            }).join('') + (sorted.length > 10 ? `<div style="color: var(--text-dim); padding: 0.4rem; text-align: center;">+${sorted.length - 10} more</div>` : '');
+        }
+
+        function msg(text, type = '') {
+            const el = document.getElementById('message');
+            el.innerHTML = text;
+            el.className = 'message-bar' + (type ? ' ' + type : '');
+        }
+
+        initGrid();
+        renderGrid();
+    </script>
+</body>
+</html>
